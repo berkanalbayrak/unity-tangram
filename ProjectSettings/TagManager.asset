@@ -3,15 +3,16 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - TangramPiece
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - PieceSetup
   - Water
   - UI
-  - 
+  - SnappedPiece
   - 
   - 
   - 
@@ -38,6 +39,15 @@ TagManager:
   - 
   - 
   m_SortingLayers:
+  - name: Background
+    uniqueID: 4044768071
+    locked: 0
+  - name: Grid
+    uniqueID: 1532998071
+    locked: 0
+  - name: Pieces
+    uniqueID: 1926387219
+    locked: 0
   - name: Default
     uniqueID: 0
     locked: 0

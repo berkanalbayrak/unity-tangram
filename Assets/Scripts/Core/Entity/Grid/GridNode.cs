@@ -1,8 +1,7 @@
-﻿using System;
-using Shapes;
+﻿using Shapes;
 using UnityEngine;
 
-namespace DefaultNamespace
+namespace Core.Entity.Grid
 {
     public class GridNode : MonoBehaviour
     {

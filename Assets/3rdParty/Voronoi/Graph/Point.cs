@@ -41,7 +41,7 @@ namespace Voronoi
 		
 		public Vector3 ToVector3()
 		{
-			return new Vector3(this.x, this.z, this.y);
+			return new Vector3(this.x, this.y, this.z);
 		}
     }
 }
