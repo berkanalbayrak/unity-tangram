@@ -10,105 +10,128 @@ namespace Core.Entity.Grid
     public class GameGrid : MonoBehaviour
     {
         [SerializeField] private GridNode gridNodePrefab;
-        [SerializeField] private Polyline borderPolyLine;
+        [SerializeField] private Polyline borderPolyline;
         [SerializeField] private Quad fillQuad;
 
         public float Spacing { get; private set; }
+        public List<GridNode> Nodes { get; private set; } = new List<GridNode>();
+        private int _gridSize;
         
-        public readonly List<GridNode> nodes = new List<GridNode>();
-        private int _actualSize;
-        
-        private EventBinding<NextLevelEvent> _nextLevelEventBinding;
+        private EventBinding<NextLevelEvent> _nextLevelBinding;
 
         private void OnEnable()
         {
-            _nextLevelEventBinding = new EventBinding<NextLevelEvent>(OnNextLevel);
-            EventBus<NextLevelEvent>.Register(_nextLevelEventBinding);
+            _nextLevelBinding = new EventBinding<NextLevelEvent>(OnNextLevel);
+            EventBus<NextLevelEvent>.Register(_nextLevelBinding);
         }
         
         private void OnDisable()
         {
-            EventBus<NextLevelEvent>.Deregister(_nextLevelEventBinding);
+            EventBus<NextLevelEvent>.Deregister(_nextLevelBinding);
         }
         
-        private void OnNextLevel(NextLevelEvent obj)
+        private void OnNextLevel(NextLevelEvent evt)
         {
-            Destroy(this.gameObject);
+            Destroy(gameObject);
         }
 
-        public void Initialize(int relativeSize, float maxSizeUnits)
+        public void Initialize(int gridExtent, float maxSize)
         {
-            _actualSize = (relativeSize * 2) + 1;
-            Spacing = maxSizeUnits / (_actualSize - 1);
+            _gridSize = CalculateGridSize(gridExtent);
+            Spacing = CalculateSpacing(maxSize);
             
-            var nodeParentObject = new GameObject("Nodes");
-            nodeParentObject.transform.SetParent(transform);
-            
-            for (var y = 0; y < _actualSize; y++)
+            GameObject nodeParent = InitializeNodeParent();
+            GenerateGridNodes(nodeParent);
+            UpdateBorderPolyline();
+            UpdateFillQuad();
+        }
+
+        private int CalculateGridSize(int gridExtent)
+        {
+            return (gridExtent * 2) + 1;
+        }
+
+        private float CalculateSpacing(float maxSize)
+        {
+            return maxSize / (_gridSize - 1);
+        }
+
+        private GameObject InitializeNodeParent()
+        {
+            var nodeParent = new GameObject("Nodes");
+            nodeParent.transform.SetParent(transform);
+            return nodeParent;
+        }
+
+        private void GenerateGridNodes(GameObject parent)
+        {
+            for (var y = 0; y < _gridSize; y++)
             {
-                for (var x = 0; x < _actualSize; x++)
+                for (var x = 0; x < _gridSize; x++)
                 {
-                    var newNodeName = $"Node({x},{y})";
-                    var newNode = Instantiate(gridNodePrefab);
-                    newNode.Initialize(x, y, x % 2 != 0 && y % 2 != 0);
-                    newNode.transform.position = new Vector3(x * Spacing, y * -Spacing, 0);
-                    newNode.transform.SetParent(nodeParentObject.transform);
-                    newNode.name = newNodeName;
-                    nodes.Add(newNode);
+                    var node = Instantiate(gridNodePrefab, new Vector3(x * Spacing, y * -Spacing, 0), Quaternion.identity, parent.transform);
+                    node.Initialize(x, y, x % 2 != 0 && y % 2 != 0);
+                    node.name = $"Node({x},{y})";
+                    Nodes.Add(node);
                 }
             }
-            
-            borderPolyLine.points.Clear();
+        }
 
-            var edgePoints = GetOrderedOutermostPoints();
-            
-            foreach (var edgePoint in edgePoints)
+        private void UpdateBorderPolyline()
+        {
+            borderPolyline.points.Clear();
+            var edgePoints = GetOrderedEdgeNodes();
+            foreach (var point in edgePoints)
             {
-                borderPolyLine.AddPoint(new Vector3(edgePoint.transform.position.x, edgePoint.transform.position.y, 0));
+                borderPolyline.AddPoint(point.transform.position);
             }
-        
-            borderPolyLine.enabled = true;
+            borderPolyline.enabled = true;
+        }
+
+        private List<GridNode> GetOrderedEdgeNodes()
+        {
+            return Nodes.Where(IsEdgeNode).OrderBy(EdgeNodeSortOrder).ToList();
+        }
+
+        private bool IsEdgeNode(GridNode node)
+        {
+            return node.X == 0 || node.X == _gridSize - 1 || node.Y == 0 || node.Y == _gridSize - 1;
+        }
+
+        private int EdgeNodeSortOrder(GridNode node)
+        {
+            //Top edge left to right
+            //Right edge top to bottom
+            //Bottom edge right to left
+            //Left edge bottom to top
             
-            var cornerPoints = GetCornerPoints();
-            
+            if (node.Y == 0) return node.X;
+            if (node.X == _gridSize - 1) return node.Y + _gridSize;
+            if (node.Y == _gridSize - 1) return 3 * _gridSize - node.X;
+            return 4 * _gridSize - node.Y;
+        }
+
+        private void UpdateFillQuad()
+        {
+            var cornerNodes = GetCornerNodes();
             for (int i = 0; i < 4; i++)
             {
-                fillQuad.SetQuadVertex(i, cornerPoints[i].transform.position);
+                fillQuad.SetQuadVertex(i, cornerNodes[i].transform.position);
             }
-
             fillQuad.enabled = true;
         }
-        
-        public List<GridNode> GetOrderedOutermostPoints()
-        {
-            // First, filter out the outermost points
-            var outerPoints = nodes.Where(p => p.X == 0 || p.X == _actualSize - 1 || p.Y == 0 || p.Y == _actualSize - 1).ToList();
 
-            // Then, order them starting from the top-left corner and moving clockwise
-            return outerPoints.OrderBy(p =>
-            {
-                if (p.Y == 0) return p.X; // Top edge, order left to right
-                if (p.X == _actualSize - 1) return p.Y + _actualSize; // Right edge, order top to bottom
-                if (p.Y == _actualSize - 1) return 3 * _actualSize - p.X; // Bottom edge, order right to left
-                return 4 * _actualSize - p.Y; // Left edge, order bottom to top
-            }).ToList();
-        }
-
-        private List<GridNode> GetCornerPoints()
+        private List<GridNode> GetCornerNodes()
         {
-            var cornerPoints = new List<GridNode>
+            return new List<GridNode>
             {
-                // Top-left
-                nodes.First(p => p.X == 0 && p.Y == 0),
-                // Top-right
-                nodes.First(p => p.X == _actualSize - 1 && p.Y == 0),
-                // Bottom-right
-                nodes.First(p => p.X == _actualSize - 1 && p.Y == _actualSize - 1),
-                // Bottom-left
-                nodes.First(p => p.X == 0 && p.Y == _actualSize - 1)
+                //Top-Left, Top-Right, Bottom-Right, Bottom-Left
+                
+                Nodes.First(p => p.X == 0 && p.Y == 0),
+                Nodes.First(p => p.X == _gridSize - 1 && p.Y == 0),
+                Nodes.First(p => p.X == _gridSize - 1 && p.Y == _gridSize - 1),
+                Nodes.First(p => p.X == 0 && p.Y == _gridSize - 1)
             };
-
-            return cornerPoints;
         }
     }
 }

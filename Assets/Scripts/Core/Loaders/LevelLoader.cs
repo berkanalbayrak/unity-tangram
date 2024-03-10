@@ -6,6 +6,7 @@ using Core.Entity.Grid;
 using Core.Entity.TangramPiece;
 using Core.Managers;
 using Data;
+using Newtonsoft.Json;
 using UnityEngine;
 using Utils;
 using Voronoi;
@@ -39,16 +40,13 @@ namespace Core.Loaders
         private EventBinding<NextLevelEvent> _nextLevelEventBinding;
         
         private GameGrid _grid;
+        
+        private List<LevelParametersDTO> _levelParameters;
 
         private void Awake()
         {
+            _levelParameters = new List<LevelParametersDTO>();
             Reset();
-        }
-
-        private void Start()
-        {
-            var levelParams = new LevelParametersDTO { GridSize = 4, PieceAmount = numSites };
-            StartGeneratingLevel(levelParams);
         }
         
         private void OnEnable()
@@ -64,6 +62,33 @@ namespace Core.Loaders
         {
             EventBus<GridGenerationCompleteEvent>.Deregister(_gridGenerationCompleteEventBinding);
             EventBus<NextLevelEvent>.Deregister(_nextLevelEventBinding);
+        }
+        
+        private void Start()
+        {
+            LoadLevelData();
+            GenerateRandomLevel();
+        }
+        
+        private void GenerateRandomLevel()
+        {
+            var randomLevel = _levelParameters[Random.Range(0, _levelParameters.Count)];
+            StartGeneratingLevel(randomLevel);
+        }
+
+        private void LoadLevelData()
+        {
+            // Can also be loaded with web requests, etc. I wanted to keep it simple for this example.
+            TextAsset file = Resources.Load<TextAsset>("level_data");
+
+            if (file != null)
+            {
+                _levelParameters = JsonConvert.DeserializeObject<LevelParametersDTO[]>(file.text).ToList();
+            }
+            else
+            {
+                Debug.LogError("Failed to load level data from Resources.");
+            }
         }
         
         private void OnNextLevel(NextLevelEvent @event)

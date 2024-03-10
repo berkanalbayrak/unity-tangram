@@ -112,7 +112,7 @@ namespace Core.Entity.TangramPiece
             var rayDirection = Vector3.forward;
 
             // Iterate through each grid node to check for potential snap points
-            foreach (var node in _grid.nodes)
+            foreach (var node in _grid.Nodes)
             {
                 // Create the start position for the raycast from the node's position
                 var rayStart = new Vector3(node.transform.position.x, node.transform.position.y, RayStartZOffset);
@@ -181,7 +181,7 @@ namespace Core.Entity.TangramPiece
             foreach (var snapPointOffset in _snapPointOffsets)
             {
                 Vector2 worldSnapPoint = transform.position + snapPointOffset;
-                Vector2? closestNode = GridUtils.FindClosestGridNodePosition(worldSnapPoint, gameGrid.nodes, snapThreshold);
+                Vector2? closestNode = GridUtils.FindClosestGridNodePosition(worldSnapPoint, gameGrid.Nodes, snapThreshold);
 
                 if (!closestNode.HasValue)
                 {

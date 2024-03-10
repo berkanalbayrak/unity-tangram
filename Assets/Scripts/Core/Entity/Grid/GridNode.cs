@@ -7,10 +7,10 @@ namespace Core.Entity.Grid
     {
         [SerializeField] private Disc disc;
         
-        public float X;
-        public float Y;
+        public int X;
+        public int Y;
 
-        public void Initialize(float x, float y, bool isPivotPoint)
+        public void Initialize(int x, int y, bool isPivotPoint)
         {
             X = x;
             Y = y;

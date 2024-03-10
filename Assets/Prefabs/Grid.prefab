@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gridNodePrefab: {fileID: 5115547942391042103, guid: 7bd032befdca8ce43859ce9251c9127e, type: 3}
-  borderPolyLine: {fileID: 1246568136576060732}
+  borderPolyline: {fileID: 1246568136576060732}
   fillQuad: {fileID: 985454662939080818}
 --- !u!1 &8818350912005149177
 GameObject:
