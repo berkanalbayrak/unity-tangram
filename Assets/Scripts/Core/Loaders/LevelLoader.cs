@@ -72,6 +72,7 @@ namespace Core.Loaders
         
         private void GenerateRandomLevel()
         {
+            Reset();
             var randomLevel = _levelParameters[Random.Range(0, _levelParameters.Count)];
             StartGeneratingLevel(randomLevel);
         }
@@ -93,8 +94,7 @@ namespace Core.Loaders
         
         private void OnNextLevel(NextLevelEvent @event)
         {
-            Reset();
-            StartGeneratingLevel( new LevelParametersDTO { GridSize = 4, PieceAmount = numSites });
+            GenerateRandomLevel();
         }
 
         private void Reset()
@@ -105,8 +105,10 @@ namespace Core.Loaders
 
         private void StartGeneratingLevel(LevelParametersDTO levelParams)
         {
+            numSites = levelParams.GridSize;
             var generateLevelEvent = new GenerateLevelEvent { LevelParameters = levelParams };
 
+            
             EventBus<GenerateLevelEvent>.Raise(generateLevelEvent);
         }
 
