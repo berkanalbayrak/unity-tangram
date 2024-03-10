@@ -1,10 +1,32 @@
 # Tangram Case Study For Unity
 
-This repository showcases a Unity-based project featuring a procedurally generated Tangram game, created as a 3-day case study. The project reflects a dedicated and earnest effort to explore and understand Unity and procedural generation techniques. The game was developed using Unity 2022.3.15f1.
+This repository showcases a Unity-based project featuring a procedurally generated Tangram, created as a 3-day case study inspired by [blocks.ovh](blocks.ovh). The project reflects a dedicated and earnest effort to explore and understand procedural generation techniques. Developed using Unity 2022.3.15f1.
 
 ![Movie_001-ezgif com-video-to-gif-converter](https://github.com/berkanalbayrak/unity-tangram/assets/40705909/f99cde79-281a-4b66-8257-8ae7ab3aee23)
 
-## Features
+## Code Structure
+
+Below is an overview of the key components and their responsibilities:
+
+### Entities
+- 
+  - `GameGrid.cs` - Manages the game grid, including its initialization and dynamic updates during gameplay.
+  - `GridNode.cs` - Represents a single node within the game grid, holding relevant data and state.
+- **TangramPiece**
+  - `TangramPiece.cs` - Manages the behavior of individual Tangram pieces, including polygon data, snapping logic, and user interactions.
+
+### Input
+- `PlayerDragHandler.cs` - Handles the drag & drop mechanic for moving Tangram pieces on the grid.
+
+### Loaders
+- `GridLoader.cs` - Responsible for generating the game grid at runtime.
+- `LevelLoader.cs` - Reads available level data and generates procedural levels based on predefined parameters, utilizing algorithms for Voronoi diagram generation and Lloyd's relaxation.
+
+### Managers
+- `ColorManager.cs` - Manages a pool of unique colors for differentiating Tangram pieces or grid elements.
+- `GameManager.cs` - Coordinates game flow, including starting the game, monitoring progress, and determining level completion.
+
+## Level Generation
 
 ### Level Configuration
 
@@ -52,6 +74,25 @@ vertices.Sort((a, b) =>
 });
 ```
 
-Each shape retains a reference to its centroid point and overlapping grid points, enabling precise grid snapping.
+Each shape retains a reference to its centroid point and overlapping grid points as an offset value, enabling precise grid snapping.
 
+## Snapping
 
+![Screenshot_20](https://github.com/berkanalbayrak/unity-tangram/assets/40705909/d3c04196-41da-4a67-88b4-45e71c6a373b)
+
+The game includes a snapping feature that helps pieces align with the grid. It works by moving pieces close to their nearest grid point if they're within a certain distance.
+
+Key steps include:
+- Identifying potential snap points based on the piece's proximity to the grid.
+- Trying snapping the piece.
+- Handling overlap and out-of-range scenarios using CircleCast2D.
+  
+See `TangramPiece.cs` for detailed implementation. 
+
+## Communication Between Modules
+
+To facilitate communication between modules, the project utilizes a [struct-based EventBus system](https://github.com/adammyhre/Unity-Event-Bus).
+
+# Closing Thoughts
+
+Thank you for taking the time to explore this project! While I've laid the foundation, there's plenty of room for improvement and new ideas. Whether you're here to browse, contribute, or provide feedback, I'm grateful for your interest.
