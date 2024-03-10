@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using _3rdParty.git_amend;
 using Core.Entity.TangramPiece;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace Core.Managers
@@ -11,7 +13,7 @@ namespace Core.Managers
         private EventBinding<PieceGenerationCompleteEvent> _pieceGenerationCompleteEventBinding;
         private EventBinding<PieceSnappedEvent> _pieceSnappedEventBinding;
 
-        private List<TangramPiece> _gamePieces = new List<TangramPiece>();
+        public List<TangramPiece> _gamePieces = new List<TangramPiece>();
         
         private void OnEnable()
         {
@@ -33,12 +35,21 @@ namespace Core.Managers
 
         private void OnPieceGenerationComplete(PieceGenerationCompleteEvent @event)
         {
-            _gamePieces = @event.GamePieces;
+            _gamePieces = @event.GamePieces.ToList();
+            StartLevelAsync();
+        }
+        
+        private async UniTaskVoid StartLevelAsync()
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(2));
+            EventBus<LevelStartEvent>.Raise(new LevelStartEvent());
         }
         
         private void OnPieceSnapped(PieceSnappedEvent obj)
         {
-            if (_gamePieces.TrueForAll(piece => piece.IsInCorrectPlace))
+            var arePiecesInCorrectSpot = _gamePieces.Any() && _gamePieces.TrueForAll(piece => piece.IsInCorrectPlace);
+            
+            if (arePiecesInCorrectSpot || _gamePieces.TrueForAll(piece => piece.Snapped))
             {
                 Debug.Log("Level Completed");
                 EventBus<LevelCompletedEvent>.Raise(new LevelCompletedEvent());

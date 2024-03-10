@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using _3rdParty.git_amend;
 using Shapes;
 using UnityEngine;
 
@@ -15,6 +17,24 @@ namespace Core.Entity.Grid
         
         public readonly List<GridNode> nodes = new List<GridNode>();
         private int _actualSize;
+        
+        private EventBinding<NextLevelEvent> _nextLevelEventBinding;
+
+        private void OnEnable()
+        {
+            _nextLevelEventBinding = new EventBinding<NextLevelEvent>(OnNextLevel);
+            EventBus<NextLevelEvent>.Register(_nextLevelEventBinding);
+        }
+        
+        private void OnDisable()
+        {
+            EventBus<NextLevelEvent>.Deregister(_nextLevelEventBinding);
+        }
+        
+        private void OnNextLevel(NextLevelEvent obj)
+        {
+            Destroy(this.gameObject);
+        }
 
         public void Initialize(int relativeSize, float maxSizeUnits)
         {

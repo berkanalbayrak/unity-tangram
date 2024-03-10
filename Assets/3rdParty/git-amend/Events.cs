@@ -40,5 +40,7 @@ namespace _3rdParty.git_amend
     
     public struct LevelCompletedEvent : IEvent {}
     
+    public struct NextLevelEvent : IEvent {}
+    
     #endregion
 }

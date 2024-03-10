@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using _3rdParty.git_amend;
 using Core.Entity.Grid;
+using DG.Tweening;
 using Shapes;
 using UnityEngine;
 using Utils;
@@ -20,15 +22,36 @@ namespace Core.Entity.TangramPiece
 
         public bool IsDraggable { get; private set; }
         public bool IsInCorrectPlace { get; private set; }
+        public bool Snapped { get; private set; }
+
 
         private static int NextPieceSortingOrder = 1;
-    
+
+        private const float MoveDuration = 1f;
         private const float SnapThreshold = 1f;
         private const int DefaultSortingOrder = 0;
+        
+        private EventBinding<NextLevelEvent> _nextLevelEventBinding;
 
         private void Awake()
         {
             SetupComponentReferences();
+        }
+
+        private void OnEnable()
+        {
+            _nextLevelEventBinding = new EventBinding<NextLevelEvent>(OnNextLevel);
+            EventBus<NextLevelEvent>.Register(_nextLevelEventBinding);
+        }
+
+        private void OnNextLevel(NextLevelEvent obj)
+        {
+            Destroy(this.gameObject);
+        }
+
+        private void OnDisable()
+        {
+            EventBus<NextLevelEvent>.Deregister(_nextLevelEventBinding);
         }
 
         private void SetupComponentReferences()
@@ -38,22 +61,47 @@ namespace Core.Entity.TangramPiece
             ResetPieceProperties();
         }
 
-        public void InitializePiece(global::Core.Entity.Grid.GameGrid gameGrid, Vector2[] points, Vector3 centroidSpot, Color color)
+        public void InitializePiece(GameGrid gameGrid, Vector2[] points, Vector3 centroidSpot, Color color, Vector3 startPosition, Vector3 movePosition)
         {
             _grid = gameGrid;
             ResetPieceProperties();
             ConfigurePolygon(points, color);
             InitializeCentroid(centroidSpot);
             IdentifySnapPoints();
+            transform.position = startPosition;
+            StartMoveTween(movePosition);
         }
-
+        
+        private void ResetPieceProperties()
+        {
+            ResetPolygon();
+            _polygonCollider.enabled = false;
+            _snapPointOffsets.Clear();
+        }
+        
+        private void ResetPolygon()
+        {
+            _polygon.points.Clear();
+            _polygon.Color = Color.black;
+            _polygon.enabled = false;
+            _polygon.SortingOrder = DefaultSortingOrder;
+        }
+        
+        private void ConfigurePolygon(Vector2[] points, Color color)
+        {
+            _polygon.points = new List<Vector2>(points);
+            _polygon.Color = color;
+            _polygon.enabled = true;
+            _polygonCollider.points = points;
+            _polygonCollider.enabled = true;
+        }
+        
         private void IdentifySnapPoints()
         {
-            const float RayStartZOffset = -5f; // Offset for the Z-axis to start the raycast behind the object
-            const float RaycastRadius = 0.1f; // Radius for the circle cast, adjust based on your needs
-            const float RaycastDistance = 10f; // Max distance for the raycast, adjust as needed
-
-            // Setup for the raycast layer and mask
+            const float RayStartZOffset = -5f; 
+            const float RaycastRadius = 0.1f; 
+            const float RaycastDistance = 10f; 
+            
             var raycastLayer = LayerMask.NameToLayer("PieceSetup");
             var raycastLayerMask = 1 << raycastLayer;
 
@@ -80,32 +128,7 @@ namespace Core.Entity.TangramPiece
             // Restore the original layer of the gameObject
             gameObject.layer = originalLayer;
         }
-
-
-        private void ResetPieceProperties()
-        {
-            ResetPolygon();
-            _polygonCollider.enabled = false;
-            _snapPointOffsets.Clear();
-        }
-
-        private void ConfigurePolygon(Vector2[] points, Color color)
-        {
-            _polygon.points = new List<Vector2>(points);
-            _polygon.Color = color;
-            _polygon.enabled = true;
-            _polygonCollider.points = points;
-            _polygonCollider.enabled = true;
-        }
-    
-        private void ResetPolygon()
-        {
-            _polygon.points.Clear();
-            _polygon.Color = Color.black;
-            _polygon.enabled = false;
-            _polygon.SortingOrder = DefaultSortingOrder;
-        }
-
+        
         private void InitializeCentroid(Vector3 centroidSpot)
         {
             gridCentroidPos = centroidSpot;
@@ -118,6 +141,11 @@ namespace Core.Entity.TangramPiece
             localCentroidObject.transform.position = centroidSpot;
             localCentroidObject.transform.SetParent(transform);
         }
+        
+        private void StartMoveTween(Vector3 movePosition)
+        {
+            transform.DOMove(movePosition, MoveDuration, false).SetEase(Ease.OutQuart);
+        }
     
         public void OnPickedUp()
         {
@@ -126,7 +154,7 @@ namespace Core.Entity.TangramPiece
 
         public void OnDropped()
         {
-            TrySnapToGrid(_grid, SnapThreshold);
+            TrySnapToGrid(_grid, _grid.Spacing / 2);
         }
 
         private void TrySnapToGrid(Grid.GameGrid gameGrid, float snapThreshold)
@@ -138,27 +166,36 @@ namespace Core.Entity.TangramPiece
                 AdjustPositionBasedOnSnapPoints(newSnapPoints, out var activeAdjustment);
                 UpdateLayerBasedOnOverlap(activeAdjustment);
             }
+            else
+            {
+                InvalidSnap();
+            }
         }
 
         private List<Vector2> DetermineNewSnapPoints(Grid.GameGrid gameGrid, float snapThreshold)
         {
-            List<Vector2> newSnapPoints = new List<Vector2>();
+            var newSnapPoints = new List<Vector2>();
 
-            foreach (Vector3 snapPointOffset in _snapPointOffsets)
+            var allSnapPointsValid = true;
+
+            foreach (var snapPointOffset in _snapPointOffsets)
             {
                 Vector2 worldSnapPoint = transform.position + snapPointOffset;
                 Vector2? closestNode = GridUtils.FindClosestGridNodePosition(worldSnapPoint, gameGrid.nodes, snapThreshold);
 
                 if (!closestNode.HasValue)
                 {
-                    return new List<Vector2>(); // Empty list indicates no snap
+                    allSnapPointsValid = false;
+                    break; // One of the snap points is out of range, no need to continue
                 }
 
                 newSnapPoints.Add(closestNode.Value);
             }
 
-            return newSnapPoints;
+            // Only return the new snap points if all of them are valid
+            return allSnapPointsValid ? newSnapPoints : new List<Vector2>();
         }
+
 
         private void AdjustPositionBasedOnSnapPoints(List<Vector2> newSnapPoints, out Vector3 adjustment)
         {
@@ -176,15 +213,24 @@ namespace Core.Entity.TangramPiece
         {
             if (IsOverlapping())
             {
+                InvalidSnap();
                 RestorePositionAndLayer(activeAdjustment);
             }
             else
             {
                 //Valid Snap
+                Snapped = true;
                 IsInCorrectPlace = IsSnappedToCorrectPlace();
                 gameObject.layer = LayerMask.NameToLayer("SnappedPiece");
                 EventBus<PieceSnappedEvent>.Raise(new PieceSnappedEvent { piece = this });
             }
+        }
+
+        private void InvalidSnap()
+        {
+            Snapped = false;
+            IsInCorrectPlace = false;
+            gameObject.layer = LayerMask.NameToLayer("Default");
         }
 
         private bool IsSnappedToCorrectPlace()

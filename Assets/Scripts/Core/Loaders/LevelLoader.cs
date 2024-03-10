@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using _3rdParty.git_amend;
 using Core.Entity.Grid;
@@ -13,76 +14,92 @@ using Random = UnityEngine.Random;
 
 namespace Core.Loaders
 {
+    
     public class LevelLoader : MonoBehaviour
     {
+        [Header("Piece Reference")]
         [SerializeField] private TangramPiece tangramPiecePrefab;
 
-        public int numSites = 5;
-        public Bounds bounds;
+        [Header("Piece Generation Settings")]
+        [SerializeField] private Transform pieceParentTransform;
+        [SerializeField] private Transform pieceMoveFromTransform;
+        [SerializeField] private Transform pieceMoveToTransform;
+        [SerializeField] private float pieceMoveDelay = 0.5f;
+        [SerializeField] private float pieceMoveMaxOffset = 0.5f;
+        
+        [Header("Voronoi Settings")]
+        [SerializeField] private int numSites = 5;
+        [SerializeField] private Bounds bounds;
 
         private List<Point> _sites;
         private FortuneVoronoi _voronoi;
         private VoronoiGraph _graph;
 
         private EventBinding<GridGenerationCompleteEvent> _gridGenerationCompleteEventBinding;
-
-        private GameGrid _grid;
+        private EventBinding<NextLevelEvent> _nextLevelEventBinding;
         
-        private static bool mode = false;
+        private GameGrid _grid;
+
+        private void Awake()
+        {
+            Reset();
+        }
 
         private void Start()
         {
-            _sites = new List<Point>();
-            _voronoi = new FortuneVoronoi();
-            Test();   
+            var levelParams = new LevelParametersDTO { GridSize = 4, PieceAmount = numSites };
+            StartGeneratingLevel(levelParams);
         }
-
+        
         private void OnEnable()
         {
             _gridGenerationCompleteEventBinding = new EventBinding<GridGenerationCompleteEvent>(OnGridGenerationComplete);
             EventBus<GridGenerationCompleteEvent>.Register(_gridGenerationCompleteEventBinding);
+            
+            _nextLevelEventBinding = new EventBinding<NextLevelEvent>(OnNextLevel);
+            EventBus<NextLevelEvent>.Register(_nextLevelEventBinding);
         }
-    
+        
         private void OnDisable()
         {
             EventBus<GridGenerationCompleteEvent>.Deregister(_gridGenerationCompleteEventBinding);
+            EventBus<NextLevelEvent>.Deregister(_nextLevelEventBinding);
+        }
+        
+        private void OnNextLevel(NextLevelEvent @event)
+        {
+            Reset();
+            StartGeneratingLevel( new LevelParametersDTO { GridSize = 4, PieceAmount = numSites });
         }
 
-        private void Test()
+        private void Reset()
         {
-            var levelParams = new LevelParametersDTO { GridSize = 4, PieceAmount = numSites };
+            _sites = new List<Point>();
+            _voronoi = new FortuneVoronoi();
+        }
+
+        private void StartGeneratingLevel(LevelParametersDTO levelParams)
+        {
             var generateLevelEvent = new GenerateLevelEvent { LevelParameters = levelParams };
 
             EventBus<GenerateLevelEvent>.Raise(generateLevelEvent);
-        }
-
-        private void Update()
-        {
-        
-            // if (Input.GetKeyDown(KeyCode.R))
-            // {
-            //     RelaxSites(1);
-            // }
-            // if (Input.GetKeyDown(KeyCode.G))
-            // {
-            //     CreateSites(true, false);
-            // }
-            //
-            // if (Input.GetKeyDown(KeyCode.P))
-            //     mode = !mode;
-
         }
 
         private void OnGridGenerationComplete(GridGenerationCompleteEvent @event)
         {
             _grid = @event.GameGrid;
             CreateSites(true, false);
-            RelaxSites(1);
-            GeneratePieces(_grid);
+            RelaxSites(numSites / 2);
+            var pieces = GeneratePieces(_grid);
+            EventBus<PieceGenerationCompleteEvent>.Raise(new PieceGenerationCompleteEvent{ GamePieces = pieces });
         }
 
-        private void GeneratePieces(GameGrid gameGrid)
+        private List<TangramPiece> GeneratePieces(GameGrid gameGrid)
         {
+            //TODO REFACTOR
+            
+            var tangramPieces = new List<TangramPiece>();
+            
             foreach (var cell in _graph.cells)
             {
                 var vertices = new List<Vector2>();
@@ -97,9 +114,6 @@ namespace Core.Loaders
                         var newVertexA = edge.va.ToVector3().SnapToGrid(gameGrid.Spacing);
                         var newVertexB = edge.vb.ToVector3().SnapToGrid(gameGrid.Spacing);
 
-                        Debug.Log(newVertexA);
-                        Debug.Log(newVertexB);
-                    
                         if (!vertices.Contains(newVertexA))
                             vertices.Add(newVertexA);
 
@@ -116,9 +130,16 @@ namespace Core.Loaders
                     });
                 }
 
+                var pieceMoveToPosition = pieceMoveToTransform.position +
+                                          (Vector3.right * UnityEngine.Random.Range(-pieceMoveMaxOffset, pieceMoveMaxOffset));
                 var newTangramPiece = Instantiate(tangramPiecePrefab, Vector3.zero, Quaternion.identity);
-                newTangramPiece.InitializePiece(gameGrid, vertices.ToArray(), new Vector3(cell.site.x, cell.site.y, 0), ColorManager.Instance.GetAvailableColor());
+                newTangramPiece.InitializePiece(gameGrid, vertices.ToArray(), new Vector3(cell.site.x, cell.site.y, 0), 
+                    ColorManager.Instance.GetAvailableColor(), pieceMoveFromTransform.position, pieceMoveToPosition);
+                
+                tangramPieces.Add(newTangramPiece);
             }
+            
+            return tangramPieces;
         }
 
         private void Compute(List<Point> sites)
@@ -162,9 +183,8 @@ namespace Core.Loaders
 
                 Point site;
                 List<Point> sites = new List<Point>();
-                float dist = 0;
 
-                float p = 1 / _graph.cells.Count * 0.1f;
+                var p = 1 / _graph.cells.Count * 0.1f;
 
                 for (int iCell = _graph.cells.Count - 1; iCell >= 0; iCell--)
                 {
@@ -178,7 +198,7 @@ namespace Core.Loaders
                     }
 
                     site = CellCentroid(cell);
-                    dist = Distance(site, cell.site);
+                    var dist = Distance(site, cell.site);
 
                     // don't relax too fast
                     if (dist > 2)
@@ -204,15 +224,15 @@ namespace Core.Loaders
 
         static float Distance(Point a, Point b)
         {
-            float dx = a.x - b.x;
-            float dy = a.y - b.y;
+            var dx = a.x - b.x;
+            var dy = a.y - b.y;
             return Mathf.Sqrt(dx * dx + dy * dy);
         }
 
         private Point CellCentroid(Voronoi.Cell cell)
         {
-            float x = 0f;
-            float y = 0f;
+            var x = 0f;
+            var y = 0f;
             Point p1, p2;
             float v;
 
@@ -232,7 +252,7 @@ namespace Core.Loaders
 
         private float CellArea(Voronoi.Cell cell)
         {
-            float area = 0.0f;
+            var area = 0.0f;
             Point p1, p2;
 
             for (int iHalfEdge = cell.halfEdges.Count - 1; iHalfEdge >= 0; iHalfEdge--)
@@ -268,21 +288,21 @@ namespace Core.Loaders
             Gizmos.color = Color.black;
             Gizmos.DrawCube(new Vector3(cell.site.x, cell.site.y), Vector3.one * 0.2f);
 
-            if (cell.halfEdges.Count > 0)
+            if (cell.halfEdges.Count <= 0) return;
+            
+            
+            foreach (HalfEdge halfEdge in cell.halfEdges)
             {
-                foreach (HalfEdge halfEdge in cell.halfEdges)
-                {
-                    Edge edge = halfEdge.edge;
+                Edge edge = halfEdge.edge;
 
-                    if (edge.va && edge.vb)
-                    {
-                        Gizmos.color = Color.red;
+                if (edge.va && edge.vb)
+                {
+                    Gizmos.color = Color.red;
                         
-                        var va = edge.va.ToVector3().SnapToGrid(_grid.Spacing);
-                        var vb = edge.vb.ToVector3().SnapToGrid(_grid.Spacing);
+                    var va = edge.va.ToVector3().SnapToGrid(_grid.Spacing);
+                    var vb = edge.vb.ToVector3().SnapToGrid(_grid.Spacing);
                     
-                        Gizmos.DrawLine(va, vb);
-                    }
+                    Gizmos.DrawLine(va, vb);
                 }
             }
         }

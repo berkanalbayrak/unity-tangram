@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace _3rdParty.git_amend
@@ -19,7 +20,9 @@ namespace _3rdParty.git_amend
 
         public static void Raise(T @event)
         {
-            foreach (var binding in bindings)
+            var bindingsCopy = bindings.ToList();
+
+            foreach (var binding in bindingsCopy)
             {
                 binding.OnEvent.Invoke(@event);
                 binding.OnEventNoArgs.Invoke();
