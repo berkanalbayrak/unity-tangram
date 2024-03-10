@@ -1,0 +1,52 @@
+[
+    {
+        "levelNumber": 1,
+        "gridSize": 5,
+        "pieceAmount": 6
+    },
+    {
+        "levelNumber": 2,
+        "gridSize": 6,
+        "pieceAmount": 7
+    },
+    {
+        "levelNumber": 3,
+        "gridSize": 4,
+        "pieceAmount": 8
+    },
+    {
+        "levelNumber": 4,
+        "gridSize": 5,
+        "pieceAmount": 9
+    },
+    {
+        "levelNumber": 5,
+        "gridSize": 6,
+        "pieceAmount": 10
+    },
+    {
+        "levelNumber": 6,
+        "gridSize": 4,
+        "pieceAmount": 11
+    },
+    {
+        "levelNumber": 7,
+        "gridSize": 5,
+        "pieceAmount": 12
+    },
+    {
+        "levelNumber": 8,
+        "gridSize": 6,
+        "pieceAmount": 5
+    },
+    {
+        "levelNumber": 9,
+        "gridSize": 4,
+        "pieceAmount": 6
+    },
+    {
+        "levelNumber": 10,
+        "gridSize": 5,
+        "pieceAmount": 7
+    }
+]
